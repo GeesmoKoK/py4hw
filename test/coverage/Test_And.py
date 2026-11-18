@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Oct 31 11:07:23 2020
+
+@author: dcr
+"""
+import py4hw
+import py4hw.debug
+
+import pytest
+from py4hw.cover import ToggleCoverage
+
+
+class Test_And:
+
+    @classmethod
+    def setup_class(cls):
+        sys = py4hw.HWSystem()
+        a = sys.wire("a", 32)
+        b = sys.wire("b", 32)
+        c = sys.wire("c", 32)
+        r1 = sys.wire("r1", 32)
+        r2 = sys.wire("r2", 32)
+        r3 = sys.wire("r3", 32)
+        r = sys.wire("r", 32)
+        py4hw.And2(sys, "and1", a, b, r1)
+        py4hw.And2(sys, "and2", a, c, r2)
+        py4hw.And2(sys, "and3", b, c, r3)
+        py4hw.And(sys, 'andx', [a, b, c], r)
+        cls.cov = ToggleCoverage(sys)
+        cls.circuit = (sys, a, b, c, r1, r2, r3, r)
+
+    
+    def test_integrity(self):
+        sys = py4hw.HWSystem()
+
+        a = sys.wire("a", 32)
+        b = sys.wire("b", 32)
+        c = sys.wire("c", 32)
+        r1 = sys.wire("r1", 32)
+        r2 = sys.wire("r2", 32)
+        r3 = sys.wire("r3", 32)
+
+        py4hw.And2(sys, "and1", a, b, r1)
+        py4hw.And2(sys, "and2", a, c, r2)
+        py4hw.And2(sys, "and3", b, c, r3)
+        
+        py4hw.Constant(sys, "a", 0xF, a)
+        py4hw.Constant(sys, "b", 0xA, b)
+        py4hw.Constant(sys, "c", 0x5, c)
+        
+        py4hw.Scope(sys, "r1 (0xF & 0xA)", r1)
+        py4hw.Scope(sys, "r2 (0xF & 0x5)", r2)
+        py4hw.Scope(sys, "r3 (0xA & 0x5)", r3)
+
+        py4hw.debug.checkIntegrity(sys)
+        
+    def test_1(self):
+        sys, a, b, c, r1, r2, r3, r = self.circuit
+        a.put(0xF)
+        b.put(0xA)
+        c.put(0x5)
+
+        sys.getSimulator().clk(1)
+        
+        assert (r1.get() == 10)
+        assert (r2.get() == 5)
+        assert (r3.get() == 0)
+
+    def test_And_integrity(self):
+        sys = py4hw.HWSystem()
+        a = sys.wire("a", 32)
+        b = sys.wire("b", 32)
+        c = sys.wire("c", 32)
+        r = sys.wire("r", 32)
+
+        py4hw.Constant(sys, "a", 0xF7F7, a)
+        py4hw.Constant(sys, "b", 0x7685, b)
+        py4hw.Constant(sys, "c", 0x3452, c)
+        
+        py4hw.And(sys, 'andx', [a,b,c], r)
+        
+        py4hw.debug.checkIntegrity(sys)
+        
+    def test_And(self):
+        sys, a, b, c, r1, r2, r3, r = self.circuit
+        a.put(0xF7F7)
+        b.put(0x7685)
+        c.put(0x3452)
+        
+        sys.getSimulator().clk(1)
+        
+        assert (r.get() == 0x3400)
+        
+    def test_verilog_gen(self):
+        sys = py4hw.HWSystem()
+        
+        a = sys.wire("a", 32)
+        b = sys.wire("b", 32)
+        r = sys.wire("r", 32)
+        
+        dut = py4hw.And(sys, "and", [a, b], r)
+
+        rtl = py4hw.VerilogGenerator(dut)
+        print(rtl.getVerilogForHierarchy(dut))
+        
+if __name__ == '__main__':
+    pytest.main(args=['-s', 'Test_And.py'])
